@@ -2,6 +2,7 @@ import { useState, FormEvent } from "react";
 import { X, Loader2, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useGatekeeper } from "@/contexts/GatekeeperContext";
+import { calculateLeadScore } from "@/lib/leadScoring";
 
 declare global {
   interface Window {
@@ -19,6 +20,7 @@ const LeadModal = () => {
     business_type: "",
     ad_budget: "",
     website_url: "",
+    whatsapp: "",
   });
 
   const update = (field: string, value: string) =>
@@ -27,14 +29,27 @@ const LeadModal = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    const budget = parseFloat(form.ad_budget) || 0;
+    const leadScore = calculateLeadScore({
+      ad_budget: budget,
+      website_url: form.website_url,
+      whatsapp: form.whatsapp,
+      email: form.email,
+      business_type: form.business_type,
+    });
+
     try {
-      const { error } = await supabase.from("leads").insert({
+      const { error } = await supabase.from("leads").insert([{
         name: form.name,
         email: form.email,
         business_type: form.business_type,
-        ad_budget: parseFloat(form.ad_budget) || 0,
+        ad_budget: budget,
         website_url: form.website_url || null,
-      });
+        whatsapp: form.whatsapp || null,
+        lead_score: leadScore,
+      }]);
+
       if (!error && window.fbq) {
         window.fbq("track", "Lead");
       }
@@ -64,8 +79,8 @@ const LeadModal = () => {
           </div>
         ) : (
           <>
-            <h3 className="text-xl font-bold mb-1">Unlock Access</h3>
-            <p className="text-sm text-muted-foreground mb-6">Submit your details to access our AI tools and get a free brand audit.</p>
+            <h3 className="text-xl font-bold mb-1">Unlock AI Tools</h3>
+            <p className="text-sm text-muted-foreground mb-6">Submit your details to access AI-powered growth tools.</p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <input required type="text" placeholder="Your name" value={form.name} onChange={(e) => update("name", e.target.value)}
                 className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
@@ -76,6 +91,8 @@ const LeadModal = () => {
               <input required type="number" placeholder="Monthly ad budget ($)" value={form.ad_budget} onChange={(e) => update("ad_budget", e.target.value)}
                 className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               <input type="url" placeholder="https://yourbusiness.com" value={form.website_url} onChange={(e) => update("website_url", e.target.value)}
+                className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <input type="tel" placeholder="WhatsApp number (optional)" value={form.whatsapp} onChange={(e) => update("whatsapp", e.target.value)}
                 className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               <button type="submit" disabled={loading}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-medium text-sm text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"

@@ -17,33 +17,48 @@ export type Database = {
       leads: {
         Row: {
           ad_budget: number | null
+          audit_report: string | null
           business_type: string
           created_at: string
           email: string
+          geo_strategy: string | null
           id: string
+          lead_score: number | null
           name: string
+          report_pdf_url: string | null
           status: string
           website_url: string | null
+          whatsapp: string | null
         }
         Insert: {
           ad_budget?: number | null
+          audit_report?: string | null
           business_type: string
           created_at?: string
           email: string
+          geo_strategy?: string | null
           id?: string
+          lead_score?: number | null
           name: string
+          report_pdf_url?: string | null
           status?: string
           website_url?: string | null
+          whatsapp?: string | null
         }
         Update: {
           ad_budget?: number | null
+          audit_report?: string | null
           business_type?: string
           created_at?: string
           email?: string
+          geo_strategy?: string | null
           id?: string
+          lead_score?: number | null
           name?: string
+          report_pdf_url?: string | null
           status?: string
           website_url?: string | null
+          whatsapp?: string | null
         }
         Relationships: []
       }
