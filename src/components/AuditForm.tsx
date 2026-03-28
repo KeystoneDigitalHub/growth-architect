@@ -1,5 +1,6 @@
 import { useState, FormEvent } from "react";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 type FormData = {
   name: string;
