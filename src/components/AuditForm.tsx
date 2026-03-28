@@ -55,7 +55,7 @@ const AuditForm = () => {
     });
 
     try {
-      const { data, error } = await supabase.from("leads").insert({
+      const { data, error } = await supabase.from("leads").insert([{
         name: form.name,
         email: form.email,
         business_type: form.business_type,
@@ -63,7 +63,7 @@ const AuditForm = () => {
         website_url: form.website_url || null,
         whatsapp: form.whatsapp || null,
         lead_score: leadScore,
-      } as Record<string, unknown>).select("id").single();
+      }]).select("id").single();
 
       if (!error && window.fbq) {
         window.fbq("track", "Lead");

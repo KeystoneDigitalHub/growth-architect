@@ -40,7 +40,7 @@ const LeadModal = () => {
     });
 
     try {
-      const { error } = await supabase.from("leads").insert({
+      const { error } = await supabase.from("leads").insert([{
         name: form.name,
         email: form.email,
         business_type: form.business_type,
@@ -48,7 +48,7 @@ const LeadModal = () => {
         website_url: form.website_url || null,
         whatsapp: form.whatsapp || null,
         lead_score: leadScore,
-      } as Record<string, unknown>);
+      }]);
 
       if (!error && window.fbq) {
         window.fbq("track", "Lead");
