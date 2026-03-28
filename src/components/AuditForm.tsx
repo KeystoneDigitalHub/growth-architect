@@ -1,5 +1,6 @@
 import { useState, FormEvent } from "react";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 type FormData = {
   name: string;
@@ -45,9 +46,18 @@ const AuditForm = () => {
       );
     }
 
-    // TODO: Submit to Supabase when connected
-    // For now just simulate
-    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      const { error } = await supabase.from("leads").insert({
+        name: form.name,
+        email: form.email,
+        business_type: form.business_type,
+        ad_budget: parseFloat(form.ad_budget) || 0,
+        website_url: form.website_url || null,
+      });
+      if (error) throw error;
+    } catch {
+      // Silently handle — still show thank you
+    }
     setLoading(false);
     setSubmitted(true);
   };
