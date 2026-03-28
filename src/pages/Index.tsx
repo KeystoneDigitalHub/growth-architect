@@ -9,6 +9,7 @@ import Founder from "@/components/Founder";
 import AuditForm from "@/components/AuditForm";
 import Footer from "@/components/Footer";
 import LeadModal from "@/components/LeadModal";
+import WhatsAppWidget from "@/components/WhatsAppWidget";
 
 const Index = () => {
   return (
@@ -24,6 +25,7 @@ const Index = () => {
         <AuditForm />
         <Footer />
         <LeadModal />
+        <WhatsAppWidget />
       </div>
     </GatekeeperProvider>
   );
