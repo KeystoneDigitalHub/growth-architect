@@ -1,8 +1,8 @@
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { ArrowRight, CheckCircle, Loader2, Download, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateLeadScore, getLeadLabel } from "@/lib/leadScoring";
-import { generateAuditPdf, downloadAuditPdf, type AuditData } from "@/lib/generatePdf";
+import { downloadAuditPdf, type AuditData } from "@/lib/generatePdf";
 import { useGatekeeper } from "@/contexts/GatekeeperContext";
 import AnimatedSection from "./AnimatedSection";
 
@@ -11,6 +11,25 @@ declare global {
     fbq?: (...args: unknown[]) => void;
   }
 }
+
+const industries = [
+  "E-commerce",
+  "Real Estate",
+  "Consulting",
+  "Agency",
+  "Education",
+  "Healthcare",
+  "Local Business",
+  "SaaS",
+  "Other",
+];
+
+const loadingMessages = [
+  "Scanning revenue leaks...",
+  "Analyzing competitors...",
+  "Detecting missed opportunities...",
+  "Generating growth strategy...",
+];
 
 type FormData = {
   name: string;
@@ -28,6 +47,7 @@ const AuditForm = () => {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditResult, setAuditResult] = useState<AuditData | null>(null);
   const [thankYouMsg, setThankYouMsg] = useState("");
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const { unlock } = useGatekeeper();
   const [form, setForm] = useState<FormData>({
     name: "",
@@ -37,6 +57,14 @@ const AuditForm = () => {
     website_url: "",
     whatsapp: "",
   });
+
+  useEffect(() => {
+    if (!auditLoading) return;
+    const interval = setInterval(() => {
+      setLoadingMsgIdx((p) => (p + 1) % loadingMessages.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [auditLoading]);
 
   const update = (field: keyof FormData, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -76,7 +104,6 @@ const AuditForm = () => {
       const label = getLeadLabel(leadScore);
       setThankYouMsg(`Lead Score: ${leadScore}/100 (${label}). Generating your AI audit report...`);
 
-      // Trigger AI audit
       if (data?.id) {
         setAuditLoading(true);
         try {
@@ -98,7 +125,6 @@ const AuditForm = () => {
             setAuditResult(audit);
             setThankYouMsg(`Lead Score: ${leadScore}/100 (${label}). Your AI audit is ready!`);
 
-            // Send email in background
             supabase.functions.invoke("send-report", {
               body: {
                 to_email: form.email,
@@ -131,7 +157,7 @@ const AuditForm = () => {
           {auditLoading && (
             <div className="flex items-center justify-center gap-3 text-primary mb-6">
               <Loader2 size={20} className="animate-spin" />
-              <span className="text-sm">AI is analyzing your business...</span>
+              <span className="text-sm">{loadingMessages[loadingMsgIdx]}</span>
             </div>
           )}
 
@@ -209,9 +235,14 @@ const AuditForm = () => {
                   className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="you@business.com" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Business Type *</label>
-                <input type="text" required value={form.business_type} onChange={(e) => update("business_type", e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="e.g. E-commerce, SaaS, Agency" />
+                <label className="block text-sm font-medium mb-2">Industry *</label>
+                <select required value={form.business_type} onChange={(e) => update("business_type", e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition">
+                  <option value="">Select your industry</option>
+                  {industries.map((ind) => (
+                    <option key={ind} value={ind}>{ind}</option>
+                  ))}
+                </select>
               </div>
               <button type="button" onClick={() => { if (form.name && form.email && form.business_type) setStep(2); }}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-medium text-sm text-primary-foreground transition-opacity hover:opacity-90"
@@ -224,11 +255,6 @@ const AuditForm = () => {
           {step === 2 && (
             <>
               <div>
-                <label className="block text-sm font-medium mb-2">Monthly Ad Budget ($) *</label>
-                <input type="number" required value={form.ad_budget} onChange={(e) => update("ad_budget", e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="e.g. 500" />
-              </div>
-              <div>
                 <label className="block text-sm font-medium mb-2">Website URL</label>
                 <input type="url" value={form.website_url} onChange={(e) => update("website_url", e.target.value)}
                   className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="https://yourbusiness.com" />
@@ -238,13 +264,18 @@ const AuditForm = () => {
                 <input type="tel" value={form.whatsapp} onChange={(e) => update("whatsapp", e.target.value)}
                   className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="+92 313 2147653" />
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Monthly Ad Budget ($)</label>
+                <input type="number" value={form.ad_budget} onChange={(e) => update("ad_budget", e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="e.g. 500" />
+              </div>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setStep(1)}
                   className="flex-1 px-6 py-3.5 rounded-lg font-medium text-sm border border-border text-foreground hover:bg-muted transition-colors">Back</button>
                 <button type="submit" disabled={loading}
                   className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-medium text-sm text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                   style={{ background: "var(--gradient-primary)" }}>
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : "Generate AI Audit"}
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : "Run AI Audit"}
                 </button>
               </div>
             </>
