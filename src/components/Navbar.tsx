@@ -6,6 +6,8 @@ const navItems = [
   { label: "Services", href: "#services" },
   { label: "AI Toolbox", href: "#toolbox" },
   { label: "Portfolio", href: "#portfolio" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "Dashboard", href: "/dashboard" },
 ];
 
 const Navbar = () => {
