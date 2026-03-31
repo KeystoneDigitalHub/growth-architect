@@ -13,15 +13,9 @@ declare global {
 }
 
 const industries = [
-  "E-commerce",
-  "Real Estate",
-  "Consulting",
-  "Agency",
-  "Education",
-  "Healthcare",
-  "Local Business",
-  "SaaS",
-  "Other",
+  "E-commerce", "Real Estate", "Consulting", "Agency",
+  "Education", "Healthcare", "Local Business", "SaaS",
+  "Bridal & Fashion", "Food & Restaurant", "Other",
 ];
 
 const loadingMessages = [
@@ -48,15 +42,20 @@ const AuditForm = () => {
   const [auditResult, setAuditResult] = useState<AuditData | null>(null);
   const [thankYouMsg, setThankYouMsg] = useState("");
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+  const [referredBy, setReferredBy] = useState<string | null>(null);
   const { unlock } = useGatekeeper();
+
   const [form, setForm] = useState<FormData>({
-    name: "",
-    email: "",
-    business_type: "",
-    ad_budget: "",
-    website_url: "",
-    whatsapp: "",
+    name: "", email: "", business_type: "",
+    ad_budget: "", website_url: "", whatsapp: "",
   });
+
+  // ✅ Read referral ID from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) setReferredBy(ref);
+  }, []);
 
   useEffect(() => {
     if (!auditLoading) return;
@@ -83,18 +82,33 @@ const AuditForm = () => {
     });
 
     try {
-      const { data, error } = await supabase.from("leads").insert([{
-        name: form.name,
-        email: form.email,
-        business_type: form.business_type,
-        ad_budget: budget,
-        website_url: form.website_url || null,
-        whatsapp: form.whatsapp || null,
-        lead_score: leadScore,
-      }]).select("id").single();
+      const { data, error } = await supabase
+        .from("leads")
+        .insert([{
+          name: form.name,
+          email: form.email,
+          business_type: form.business_type,
+          ad_budget: budget,
+          website_url: form.website_url || null,
+          whatsapp: form.whatsapp || null,
+          lead_score: leadScore,
+          referred_by: referredBy || null,
+        }])
+        .select("id, referral_id")
+        .single();
 
-      if (!error && window.fbq) {
-        window.fbq("track", "Lead");
+      if (!error && data) {
+        // ✅ Save to localStorage — dashboard uses this
+        localStorage.setItem("kgs_lead_id", data.id);
+        localStorage.setItem("kgs_referral_id", data.referral_id || "");
+        localStorage.setItem("kgs_lead_score", String(leadScore));
+
+        // ✅ Increment referral count on referrer's record
+        if (referredBy) {
+          await supabase.rpc("increment_referral_count", { ref_id: referredBy });
+        }
+
+        if (window.fbq) window.fbq("track", "Lead");
       }
 
       setLoading(false);
@@ -131,6 +145,7 @@ const AuditForm = () => {
                 name: form.name,
                 conversion_score: audit.conversion_score,
                 summary: audit.summary,
+                lead_id: data.id,
               },
             }).catch(() => {});
           }
@@ -171,7 +186,9 @@ const AuditForm = () => {
                 <div className="grid sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Conversion Score</span>
-                    <p className="font-bold text-2xl text-primary">{auditResult.conversion_score}/100</p>
+                    <p className="font-bold text-2xl text-primary">
+                      {auditResult.conversion_score}/100
+                    </p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Priority</span>
@@ -179,19 +196,19 @@ const AuditForm = () => {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground mt-4">{auditResult.summary}</p>
-
                 {auditResult.revenue_leaks?.length > 0 && (
                   <div className="mt-4">
                     <p className="font-medium text-sm mb-2">Revenue Leaks:</p>
                     <ul className="space-y-1">
                       {auditResult.revenue_leaks.map((leak, i) => (
-                        <li key={i} className="text-xs text-muted-foreground">• {leak}</li>
+                        <li key={i} className="text-xs text-muted-foreground">
+                          • {leak}
+                        </li>
                       ))}
                     </ul>
                   </div>
                 )}
               </div>
-
               <button
                 onClick={() => downloadAuditPdf(auditResult)}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-medium text-sm text-primary-foreground transition-opacity hover:opacity-90"
@@ -201,8 +218,9 @@ const AuditForm = () => {
               </button>
             </div>
           )}
-
-          <p className="text-xs text-muted-foreground mt-6">Keystone Growth Systems — Diagnosis → Strategy → Execution</p>
+          <p className="text-xs text-muted-foreground mt-6">
+            Keystone Growth Systems — Diagnosis → Strategy → Execution
+          </p>
         </AnimatedSection>
       </section>
     );
@@ -211,42 +229,79 @@ const AuditForm = () => {
   return (
     <section id="audit" className="section-padding">
       <AnimatedSection className="max-w-xl mx-auto">
-        <p className="text-xs uppercase tracking-[0.2em] text-primary mb-4">Conversion Engine</p>
-        <h2 className="text-3xl sm:text-4xl font-bold mb-4 tracking-tight">Your Growth Bottlenecks Identified in 30 Seconds.</h2>
-        <p className="text-muted-foreground mb-8">Tell us about your business. Our AI will diagnose friction and map a growth path.</p>
+        <p className="text-xs uppercase tracking-[0.2em] text-primary mb-4">
+          Conversion Engine
+        </p>
+        <h2 className="text-3xl sm:text-4xl font-bold mb-4 tracking-tight">
+          Your Growth Bottlenecks Identified in 30 Seconds.
+        </h2>
+        <p className="text-muted-foreground mb-8">
+          Tell us about your business. Our AI will diagnose friction and map a growth path.
+        </p>
 
         <div className="flex gap-2 mb-8">
           {[1, 2].map((s) => (
-            <div key={s} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${step >= s ? "bg-primary" : "bg-muted"}`} />
+            <div
+              key={s}
+              className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+                step >= s ? "bg-primary" : "bg-muted"
+              }`}
+            />
           ))}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           {step === 1 && (
             <>
               <div>
-                <label className="block text-sm font-medium mb-2">Name *</label>
-                <input type="text" required value={form.name} onChange={(e) => update("name", e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="Your name" />
+                <label htmlFor="audit-name" className="block text-sm font-medium mb-2">
+                  Name *
+                </label>
+                <input
+                  id="audit-name" name="name" type="text"
+                  required autoComplete="name"
+                  value={form.name}
+                  onChange={(e) => update("name", e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
+                  placeholder="Your name"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Email *</label>
-                <input type="email" required value={form.email} onChange={(e) => update("email", e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="you@business.com" />
+                <label htmlFor="audit-email" className="block text-sm font-medium mb-2">
+                  Email *
+                </label>
+                <input
+                  id="audit-email" name="email" type="email"
+                  required autoComplete="email"
+                  value={form.email}
+                  onChange={(e) => update("email", e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
+                  placeholder="you@business.com"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Industry *</label>
-                <select required value={form.business_type} onChange={(e) => update("business_type", e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition">
+                <label htmlFor="audit-industry" className="block text-sm font-medium mb-2">
+                  Industry *
+                </label>
+                <select
+                  id="audit-industry" name="business_type"
+                  required
+                  value={form.business_type}
+                  onChange={(e) => update("business_type", e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
+                >
                   <option value="">Select your industry</option>
                   {industries.map((ind) => (
                     <option key={ind} value={ind}>{ind}</option>
                   ))}
                 </select>
               </div>
-              <button type="button" onClick={() => { if (form.name && form.email && form.business_type) setStep(2); }}
+              <button
+                type="button"
+                onClick={() => { if (form.name && form.email && form.business_type) setStep(2); }}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-medium text-sm text-primary-foreground transition-opacity hover:opacity-90"
-                style={{ background: "var(--gradient-primary)" }}>
+                style={{ background: "var(--gradient-primary)" }}
+              >
                 Next Step <ArrowRight size={16} />
               </button>
             </>
@@ -255,26 +310,56 @@ const AuditForm = () => {
           {step === 2 && (
             <>
               <div>
-                <label className="block text-sm font-medium mb-2">Website URL</label>
-                <input type="url" value={form.website_url} onChange={(e) => update("website_url", e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="https://yourbusiness.com" />
+                <label htmlFor="audit-website" className="block text-sm font-medium mb-2">
+                  Website URL
+                </label>
+                <input
+                  id="audit-website" name="website_url" type="url"
+                  autoComplete="url"
+                  value={form.website_url}
+                  onChange={(e) => update("website_url", e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
+                  placeholder="https://yourbusiness.com"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">WhatsApp Number</label>
-                <input type="tel" value={form.whatsapp} onChange={(e) => update("whatsapp", e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="+92 313 2147653" />
+                <label htmlFor="audit-whatsapp" className="block text-sm font-medium mb-2">
+                  WhatsApp Number
+                </label>
+                <input
+                  id="audit-whatsapp" name="whatsapp" type="tel"
+                  autoComplete="tel"
+                  value={form.whatsapp}
+                  onChange={(e) => update("whatsapp", e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
+                  placeholder="+92 313 2147653"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Monthly Ad Budget ($)</label>
-                <input type="number" value={form.ad_budget} onChange={(e) => update("ad_budget", e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition" placeholder="e.g. 500" />
+                <label htmlFor="audit-budget" className="block text-sm font-medium mb-2">
+                  Monthly Ad Budget ($)
+                </label>
+                <input
+                  id="audit-budget" name="ad_budget" type="number"
+                  min="0"
+                  value={form.ad_budget}
+                  onChange={(e) => update("ad_budget", e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
+                  placeholder="e.g. 500"
+                />
               </div>
               <div className="flex gap-3">
-                <button type="button" onClick={() => setStep(1)}
-                  className="flex-1 px-6 py-3.5 rounded-lg font-medium text-sm border border-border text-foreground hover:bg-muted transition-colors">Back</button>
-                <button type="submit" disabled={loading}
+                <button
+                  type="button" onClick={() => setStep(1)}
+                  className="flex-1 px-6 py-3.5 rounded-lg font-medium text-sm border border-border text-foreground hover:bg-muted transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit" disabled={loading}
                   className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-medium text-sm text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-                  style={{ background: "var(--gradient-primary)" }}>
+                  style={{ background: "var(--gradient-primary)" }}
+                >
                   {loading ? <Loader2 size={16} className="animate-spin" /> : "Run AI Audit"}
                 </button>
               </div>

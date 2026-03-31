@@ -6,9 +6,14 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
 
-// ✅ FIXED: Proper asset imports from src/assets
 import hookGenImg from "@/assets/Ai_Hook_Generator.png";
 import gapHunterImg from "@/assets/Gap_Hunter_Upgraded.png";
+
+declare global {
+  interface Window {
+    fbq?: (...args: unknown[]) => void;
+  }
+}
 
 type Hook = {
   type: string;
@@ -49,20 +54,42 @@ const Dashboard = () => {
   const [referralCount, setReferralCount] = useState(0);
   const gapLocked = referralCount < 2;
 
+  // ✅ FIX: localStorage-first fetch — no more 400 error
   useEffect(() => {
-    const fetchLatestLead = async () => {
-      const { data } = await supabase
-        .from("leads")
-        .select("lead_score, referral_count")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      if (data) {
-        setLeadScore(data.lead_score ?? null);
-        setReferralCount(data.referral_count ?? 0);
+    const fetchLeadData = async () => {
+      const storedId    = localStorage.getItem("kgs_lead_id");
+      const storedScore = localStorage.getItem("kgs_lead_score");
+
+      // Priority 1: fetch by stored lead ID
+      if (storedId) {
+        const { data } = await supabase
+          .from("leads")
+          .select("lead_score, referral_count, referral_id")
+          .eq("id", storedId)
+          .single();
+
+        if (data) {
+          setLeadScore(data.lead_score ?? null);
+          setReferralCount(data.referral_count ?? 0);
+          // Keep referral_id fresh in localStorage
+          if (data.referral_id) {
+            localStorage.setItem("kgs_referral_id", data.referral_id);
+          }
+          return;
+        }
       }
+
+      // Priority 2: use cached score from localStorage
+      if (storedScore) {
+        setLeadScore(Number(storedScore));
+        return;
+      }
+
+      // Priority 3: no localStorage — skip DB call (avoids 400)
+      // User hasn't submitted audit yet — that's fine
     };
-    fetchLatestLead();
+
+    fetchLeadData();
   }, []);
 
   const generateHooks = async () => {
@@ -73,13 +100,14 @@ const Dashboard = () => {
         body: { industry: hookIndustry },
       });
       if (error) throw error;
-      if (data?.hooks) {
+      if (data?.hooks && data.hooks.length > 0) {
         setHooks(data.hooks);
       } else {
-        setHookError("No hooks returned. Check edge function.");
+        setHookError("No hooks returned. Try again or check Supabase edge function logs.");
       }
-    } catch (e: any) {
-      setHookError(e.message || "AI service error. Check GROQ_API_KEY in Supabase secrets.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "AI service error";
+      setHookError(msg);
     }
     setHookLoading(false);
   };
@@ -93,17 +121,48 @@ const Dashboard = () => {
         body: { business_type: gapBusiness },
       });
       if (error) throw error;
-      if (data?.gaps) setGaps(data.gaps);
-    } catch (e: any) {
-      setGapError(e.message || "Gap analysis failed.");
+      if (data?.gaps && data.gaps.length > 0) {
+        setGaps(data.gaps);
+      } else {
+        setGapError("No gaps returned. Try a more specific niche.");
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Gap analysis failed";
+      setGapError(msg);
     }
     setGapLoading(false);
   };
 
+  // ✅ FIX: Working share handler
+  const handleShareReferral = () => {
+    const referralId = localStorage.getItem("kgs_referral_id");
+    if (!referralId) {
+      alert(
+        "Complete the AI Audit form first — your referral link will be generated automatically."
+      );
+      return;
+    }
+    const link = `${window.location.origin}/?ref=${referralId}`;
+    const msg  = encodeURIComponent(
+      `Hey! I used Keystone Growth Systems — AI found revenue leaks in my business in 30 seconds. Get your free audit here: ${link}`
+    );
+
+    // Copy to clipboard silently
+    navigator.clipboard.writeText(link).catch(() => {});
+
+    // Open WhatsApp share
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
+
+    // Fire Meta Pixel event
+    if (window.fbq) {
+      window.fbq("trackCustom", "ReferralShared", { referral_id: referralId });
+    }
+  };
+
   const labelColor = (label: string) => {
     if (label.toLowerCase().includes("aggressive")) return "text-red-400";
-    if (label.toLowerCase().includes("high")) return "text-green-400";
-    if (label.toLowerCase().includes("strong")) return "text-blue-400";
+    if (label.toLowerCase().includes("high"))       return "text-green-400";
+    if (label.toLowerCase().includes("strong"))     return "text-blue-400";
     return "text-yellow-400";
   };
 
@@ -114,7 +173,8 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+
+      {/* ── Header ─────────────────────────────────────────── */}
       <header className="border-b border-border px-4 sm:px-8 py-4 flex items-center justify-between backdrop-blur-sm bg-background/80 sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <button
@@ -131,7 +191,6 @@ const Dashboard = () => {
           </h1>
         </div>
 
-        {/* Lead Score Badge */}
         {leadScore !== null && (
           <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full border border-purple-500/30 bg-purple-500/10">
             <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
@@ -165,16 +224,16 @@ const Dashboard = () => {
         </div>
       </header>
 
+      {/* ── Main ───────────────────────────────────────────── */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
 
-        {/* ===== HOOK GENERATOR TAB ===== */}
+        {/* ══ HOOK GENERATOR TAB ══ */}
         {activeTab === "hooks" && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            {/* Reference Image Preview */}
-            <div className="mb-6 rounded-xl overflow-hidden border border-purple-500/20 max-h-48 object-cover">
+            <div className="mb-6 rounded-xl overflow-hidden border border-purple-500/20 max-h-48">
               <img
                 src={hookGenImg}
-                alt="Hook Generator Reference"
+                alt="Hook Generator"
                 className="w-full h-48 object-cover object-top"
               />
             </div>
@@ -193,7 +252,7 @@ const Dashboard = () => {
                 {[
                   "E-commerce", "Real Estate", "Consulting", "Agency",
                   "Education", "Healthcare", "Local Business", "SaaS",
-                  "Bridal & Fashion", "Food & Restaurant"
+                  "Bridal & Fashion", "Food & Restaurant",
                 ].map((i) => (
                   <option key={i} value={i}>{i}</option>
                 ))}
@@ -203,11 +262,9 @@ const Dashboard = () => {
                 disabled={hookLoading}
                 className="px-6 py-3 rounded-lg text-sm font-semibold text-white disabled:opacity-50 transition-opacity hover:opacity-90 bg-gradient-to-r from-purple-600 to-blue-600"
               >
-                {hookLoading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  "⚡ Generate Hooks"
-                )}
+                {hookLoading
+                  ? <Loader2 size={16} className="animate-spin" />
+                  : "⚡ Generate Hooks"}
               </button>
             </div>
 
@@ -261,14 +318,13 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        {/* ===== GAP HUNTER TAB ===== */}
+        {/* ══ GAP HUNTER TAB ══ */}
         {activeTab === "gaps" && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            {/* Reference Image */}
             <div className="mb-6 rounded-xl overflow-hidden border border-purple-500/20 max-h-48">
               <img
                 src={gapHunterImg}
-                alt="Gap Hunter Reference"
+                alt="Gap Hunter"
                 className="w-full h-48 object-cover object-top"
               />
             </div>
@@ -278,7 +334,7 @@ const Dashboard = () => {
               Identify what your competitors rank for — UK, USA, UAE, Canada targeting.
             </p>
 
-            {/* Referral Lock */}
+            {/* ── Referral Lock ── */}
             {gapLocked ? (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -287,34 +343,61 @@ const Dashboard = () => {
               >
                 <Lock size={36} className="text-yellow-400 mx-auto mb-3" />
                 <h3 className="font-bold text-lg mb-2">Gap Hunter Locked</h3>
-                <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-                  Refer <strong className="text-yellow-400">2 businesses</strong> to unlock full
-                  Gap Hunter access. You have {referralCount}/2 referrals.
+                <p className="text-muted-foreground text-sm max-w-sm mx-auto mb-4">
+                  Refer{" "}
+                  <strong className="text-yellow-400">2 businesses</strong> to unlock full
+                  Gap Hunter access.
                 </p>
-                <button className="mt-4 px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-yellow-500 to-orange-500">
-                  Share Referral Link
+
+                {/* Progress bar */}
+                <div className="w-full max-w-xs mx-auto mb-5">
+                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                    <span>Referral Progress</span>
+                    <span className="text-yellow-400 font-semibold">
+                      {referralCount}/2
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-orange-500"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min((referralCount / 2) * 100, 100)}%` }}
+                      transition={{ duration: 0.8 }}
+                    />
+                  </div>
+                </div>
+
+                {/* ✅ FIX: Functional share button */}
+                <button
+                  onClick={handleShareReferral}
+                  className="px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-yellow-500 to-orange-500 hover:opacity-90 transition-opacity"
+                >
+                  📤 Share on WhatsApp — Unlock Gap Hunter
                 </button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Referral link copied to clipboard automatically
+                </p>
               </motion.div>
+
             ) : (
+              /* ── Unlocked Gap Hunter ── */
               <>
                 <div className="flex gap-3 mb-8 flex-wrap">
                   <input
                     value={gapBusiness}
                     onChange={(e) => setGapBusiness(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && generateGaps()}
                     className="flex-1 min-w-[200px] px-4 py-3 rounded-lg bg-muted border border-border text-foreground text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
                     placeholder="e.g. Bridal fashion Karachi, SaaS agency Dubai"
-                    onKeyDown={(e) => e.key === "Enter" && generateGaps()}
                   />
                   <button
                     onClick={generateGaps}
                     disabled={gapLoading || !gapBusiness}
                     className="px-6 py-3 rounded-lg text-sm font-semibold text-white disabled:opacity-50 transition-opacity hover:opacity-90 bg-gradient-to-r from-purple-600 to-blue-600"
                   >
-                    {gapLoading ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      "🔍 Hunt Gaps"
-                    )}
+                    {gapLoading
+                      ? <Loader2 size={16} className="animate-spin" />
+                      : "🔍 Hunt Gaps"}
                   </button>
                 </div>
 
@@ -330,12 +413,24 @@ const Dashboard = () => {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border bg-purple-500/5">
-                            <th className="text-left p-4 text-muted-foreground font-medium">Keyword</th>
-                            <th className="text-center p-4 text-muted-foreground font-medium">Search Intent</th>
-                            <th className="text-center p-4 text-muted-foreground font-medium">Your Status</th>
-                            <th className="text-center p-4 text-muted-foreground font-medium">Competitor</th>
-                            <th className="text-center p-4 text-muted-foreground font-medium">Traffic</th>
-                            <th className="text-center p-4 text-muted-foreground font-medium">GEO Market</th>
+                            <th className="text-left p-4 text-muted-foreground font-medium">
+                              Keyword
+                            </th>
+                            <th className="text-center p-4 text-muted-foreground font-medium">
+                              Search Intent
+                            </th>
+                            <th className="text-center p-4 text-muted-foreground font-medium">
+                              Your Status
+                            </th>
+                            <th className="text-center p-4 text-muted-foreground font-medium">
+                              Competitor
+                            </th>
+                            <th className="text-center p-4 text-muted-foreground font-medium">
+                              Traffic
+                            </th>
+                            <th className="text-center p-4 text-muted-foreground font-medium">
+                              GEO Market
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
