@@ -68,12 +68,12 @@ const Dashboard = () => {
           .eq("id", storedId)
           .single();
 
-        if (data) {
-          setLeadScore(data.lead_score ?? null);
-          setReferralCount(data.referral_count ?? 0);
-          // Keep referral_id fresh in localStorage
-          if (data.referral_id) {
-            localStorage.setItem("kgs_referral_id", data.referral_id);
+        const row = data as any;
+        if (row) {
+          setLeadScore(row.lead_score ?? null);
+          setReferralCount(row.referral_count ?? 0);
+          if (row.referral_id) {
+            localStorage.setItem("kgs_referral_id", row.referral_id);
           }
           return;
         }

@@ -92,20 +92,19 @@ const AuditForm = () => {
           website_url: form.website_url || null,
           whatsapp: form.whatsapp || null,
           lead_score: leadScore,
-          referred_by: referredBy || null,
-        }])
+        } as any])
         .select("id, referral_id")
         .single();
 
-      if (!error && data) {
-        // ✅ Save to localStorage — dashboard uses this
-        localStorage.setItem("kgs_lead_id", data.id);
-        localStorage.setItem("kgs_referral_id", data.referral_id || "");
+      const row = data as any;
+      if (!error && row) {
+        localStorage.setItem("kgs_lead_id", row.id);
+        localStorage.setItem("kgs_referral_id", row.referral_id || "");
         localStorage.setItem("kgs_lead_score", String(leadScore));
 
-        // ✅ Increment referral count on referrer's record
+
         if (referredBy) {
-          await supabase.rpc("increment_referral_count", { ref_id: referredBy });
+          await supabase.rpc("increment_referral_count" as any, { ref_id: referredBy });
         }
 
         if (window.fbq) window.fbq("track", "Lead");
@@ -118,7 +117,7 @@ const AuditForm = () => {
       const label = getLeadLabel(leadScore);
       setThankYouMsg(`Lead Score: ${leadScore}/100 (${label}). Generating your AI audit report...`);
 
-      if (data?.id) {
+      if (row?.id) {
         setAuditLoading(true);
         try {
           const { data: auditData } = await supabase.functions.invoke("generate-audit", {
@@ -126,7 +125,7 @@ const AuditForm = () => {
               website_url: form.website_url,
               business_type: form.business_type,
               name: form.name,
-              lead_id: data.id,
+              lead_id: row.id,
             },
           });
 
@@ -145,7 +144,7 @@ const AuditForm = () => {
                 name: form.name,
                 conversion_score: audit.conversion_score,
                 summary: audit.summary,
-                lead_id: data.id,
+                lead_id: row.id,
               },
             }).catch(() => {});
           }
