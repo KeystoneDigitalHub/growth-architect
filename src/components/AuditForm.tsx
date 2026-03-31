@@ -102,7 +102,7 @@ const AuditForm = () => {
         localStorage.setItem("kgs_referral_id", row.referral_id || "");
         localStorage.setItem("kgs_lead_score", String(leadScore));
 
-        const referredBy = new URLSearchParams(window.location.search).get("ref");
+
         if (referredBy) {
           await supabase.rpc("increment_referral_count" as any, { ref_id: referredBy });
         }
