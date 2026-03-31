@@ -117,7 +117,7 @@ const AuditForm = () => {
       const label = getLeadLabel(leadScore);
       setThankYouMsg(`Lead Score: ${leadScore}/100 (${label}). Generating your AI audit report...`);
 
-      if (data?.id) {
+      if (row?.id) {
         setAuditLoading(true);
         try {
           const { data: auditData } = await supabase.functions.invoke("generate-audit", {
@@ -125,7 +125,7 @@ const AuditForm = () => {
               website_url: form.website_url,
               business_type: form.business_type,
               name: form.name,
-              lead_id: data.id,
+              lead_id: row.id,
             },
           });
 
@@ -144,7 +144,7 @@ const AuditForm = () => {
                 name: form.name,
                 conversion_score: audit.conversion_score,
                 summary: audit.summary,
-                lead_id: data.id,
+                lead_id: row.id,
               },
             }).catch(() => {});
           }
