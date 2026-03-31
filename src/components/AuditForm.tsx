@@ -92,20 +92,19 @@ const AuditForm = () => {
           website_url: form.website_url || null,
           whatsapp: form.whatsapp || null,
           lead_score: leadScore,
-          referred_by: referredBy || null,
-        }])
+        } as any])
         .select("id, referral_id")
         .single();
 
-      if (!error && data) {
-        // ✅ Save to localStorage — dashboard uses this
-        localStorage.setItem("kgs_lead_id", data.id);
-        localStorage.setItem("kgs_referral_id", data.referral_id || "");
+      const row = data as any;
+      if (!error && row) {
+        localStorage.setItem("kgs_lead_id", row.id);
+        localStorage.setItem("kgs_referral_id", row.referral_id || "");
         localStorage.setItem("kgs_lead_score", String(leadScore));
 
-        // ✅ Increment referral count on referrer's record
+        const referredBy = new URLSearchParams(window.location.search).get("ref");
         if (referredBy) {
-          await supabase.rpc("increment_referral_count", { ref_id: referredBy });
+          await supabase.rpc("increment_referral_count" as any, { ref_id: referredBy });
         }
 
         if (window.fbq) window.fbq("track", "Lead");
