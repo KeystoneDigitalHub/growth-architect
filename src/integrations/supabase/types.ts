@@ -25,8 +25,12 @@ export type Database = {
           id: string
           lead_score: number | null
           name: string
+          referral_count: number
+          referral_id: string | null
+          referred_by: string | null
           report_pdf_url: string | null
           status: string
+          user_id: string | null
           website_url: string | null
           whatsapp: string | null
         }
@@ -40,8 +44,12 @@ export type Database = {
           id?: string
           lead_score?: number | null
           name: string
+          referral_count?: number
+          referral_id?: string | null
+          referred_by?: string | null
           report_pdf_url?: string | null
           status?: string
+          user_id?: string | null
           website_url?: string | null
           whatsapp?: string | null
         }
@@ -55,8 +63,12 @@ export type Database = {
           id?: string
           lead_score?: number | null
           name?: string
+          referral_count?: number
+          referral_id?: string | null
+          referred_by?: string | null
           report_pdf_url?: string | null
           status?: string
+          user_id?: string | null
           website_url?: string | null
           whatsapp?: string | null
         }
@@ -67,7 +79,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_referral_count: { Args: { ref_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
