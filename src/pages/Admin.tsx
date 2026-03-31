@@ -24,7 +24,7 @@ const Admin = () => {
 
   const handleAuth = () => {
     // Simple admin gate — in production use proper auth
-    if (password === "keystone2024") {
+    if (password === "keystone2025") {
       setAuthenticated(true);
       fetchLeads();
     }

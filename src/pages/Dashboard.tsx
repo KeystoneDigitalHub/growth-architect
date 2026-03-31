@@ -35,7 +35,10 @@ type GapItem = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<"hooks" | "gaps">("hooks");
+  const [activeTab, setActiveTab] = useState<"hooks" | "gaps">(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("tab") === "gaps" ? "gaps" : "hooks";
+  });
 
   // Hook Generator State
   const [hookIndustry, setHookIndustry] = useState("E-commerce");

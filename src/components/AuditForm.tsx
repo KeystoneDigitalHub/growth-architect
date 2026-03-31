@@ -208,13 +208,30 @@ const AuditForm = () => {
                   </div>
                 )}
               </div>
-              <button
-                onClick={() => downloadAuditPdf(auditResult)}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-medium text-sm text-primary-foreground transition-opacity hover:opacity-90"
-                style={{ background: "var(--gradient-primary)" }}
-              >
-                <Download size={16} /> Download PDF Report
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={() => downloadAuditPdf(auditResult)}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-medium text-sm text-primary-foreground transition-opacity hover:opacity-90"
+                  style={{ background: "var(--gradient-primary)" }}
+                >
+                  <Download size={16} /> Download PDF Report
+                </button>
+                <button
+                  onClick={() => { window.location.href = "/dashboard?tab=hooks"; }}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-medium text-sm border border-purple-500/30 text-foreground hover:bg-purple-500/10 transition-colors"
+                >
+                  <Sparkles size={16} /> Generate Ad Hooks →
+                </button>
+                <a
+                  href="https://wa.me/923132147653?text=Hi+Shahan,+I+got+my+growth+audit+score"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => { if (window.fbq) window.fbq("track", "Contact"); }}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-medium text-sm bg-green-600 text-white hover:bg-green-700 transition-colors"
+                >
+                  💬 Discuss Strategy on WhatsApp
+                </a>
+              </div>
             </div>
           )}
           <p className="text-xs text-muted-foreground mt-6">
